@@ -10,7 +10,7 @@ depends=('python>=3.11' 'git')
 checkdepends=('python-pytest')
 optdepends=('claude-code: registers the MCP and provides the plugin directory cache')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('9d1af9a9a35089a80f7c498f8aab93b3497697f6a6ddd0c6bd582654fc555912')
 
 check() {
   cd "$pkgname-$pkgver"

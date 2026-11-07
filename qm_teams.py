@@ -54,3 +54,62 @@ def teams_for(text, limit=3):
         return [("general", "no rule matched")]
     scored.sort()
     return [(team, f"keyword '{kw}'") for _, _, team, kw in scored[:limit]]
+
+
+# ---------- rev 3: task-side team prior (FR-16, FR-18) ----------
+# Phrases (weight 3) come only from misses on the dev split of tests/routing_set.json.
+PHRASES = {
+    "build": "project skeleton|scaffold|clean up|refactor|split it into|smaller functions",
+    "debug": "fails randomly|flaky|passes locally|broke after|which commit|bisect",
+    "research": "look up|on the web|latest info|web search",
+    "security-reverse-eng": "leaked|api keys|passwords|secrets",
+    "data-ml": "sql query|classifier|train a|machine learning",
+    "devops-infra": "github actions|on every push|ci pipeline",
+    "computer-use-browser": "scrape|crawl",
+    "business-ops": "ranks on google|seo|invoice|unpaid",
+}
+_PHRASES = {t: p.split("|") for t, p in PHRASES.items()}
+GENERIC = frozenset("find write test tests testing fix check build make set run".split())
+NEGATORS = frozenset("not no without don't dont never".split())
+MARGIN = 0.2   # FR-16: top1 - top2 below this is low confidence
+
+
+def _negated(toks):
+    """Indexes of tokens within 3 words after a negator."""
+    out = set()
+    for i, t in enumerate(toks):
+        if t in NEGATORS:
+            out.update(range(i + 1, i + 4))
+    return out
+
+
+def _raw_scores(text):
+    low = (text or "").lower()
+    toks = tokens(low)
+    neg = _negated(toks)
+    scores = {}
+    for team, kws in _RULES.items():
+        s = 0.0
+        for i, tok in enumerate(toks):
+            hit = any(_hit(kw, [tok], tok) for kw in kws)
+            if hit:
+                w = 0.5 if tok in GENERIC else 1.0
+                s += -2.0 if i in neg else w
+        for ph in _PHRASES.get(team, []):
+            pos = low.find(ph)
+            if pos >= 0:
+                start = len(tokens(low[:pos]))
+                s += -2.0 if start in neg else 3.0
+        scores[team] = s
+    return scores
+
+
+def task_prior(text):
+    """FR-16: normalised P(team|task) over positive scores; {} if no hit or low confidence."""
+    pos = {t: s for t, s in _raw_scores(text).items() if s > 0}
+    total = sum(pos.values())
+    if not total:
+        return {}
+    prior = {t: s / total for t, s in pos.items()}
+    ranked = sorted(prior.values(), reverse=True) + [0.0]
+    return prior if ranked[0] - ranked[1] >= MARGIN else {}

@@ -151,6 +151,8 @@ user-chosen prompt library where they fit.
 - FR-21: Real eval tasks: a script samples about 150 user prompts from SWE-chat into the data dir. They are labelled with a team and expected component substrings before the router is run on them. Neither the prompts nor the labels are committed (attribution noted in NOTICE).
 - FR-22: Prompt library: when `prompt_sources.json` exists, the rebuild clones those repos into `prompt_repos/` (data dir, gitignored) and indexes each prompt file as kind `prompt` with id `file@repo`, team labels and a 200-char excerpt. Prompts compete in the `plan` and `execute` stations like other components, grade `A` (text only, nothing runs). Route lines show the id and local path, never the full text. No prompt text is shipped in the repo, tests or release.
 
+- FR-23: Tool links: when `<data_dir>/tool_links.json` exists (list of `{name, url, desc}`, desc ≤ 200 chars in our own words), each entry is indexed as kind `link` with id `name@links`, grade `B` (reason: "external link; nothing fetched or run"). Links compete in `execute`; the route line shows the URL as the reason. The file is user-local and never committed.
+
 ## Edge Cases
 | Case | Expected |
 |---|---|
@@ -168,6 +170,7 @@ user-chosen prompt library where they fit.
 - AC-15 (FR-20): `explain(id, task)` prints the expected prior value for a fixture.
 - AC-16 (FR-21): the sampler writes only into the data dir; a test asserts no file under the repo tree is created.
 - AC-17 (FR-22): with a fixture prompt repo, a matching task routes `file@repo` into `execute`; the route text never contains more than the 70-char excerpt; `git ls-files` contains no prompt text.
+- AC-18 (FR-23): with a fixture `tool_links.json`, an encoding task routes `name@links` into `execute` and the line contains its URL; without the file, no `link` components exist.
 - Release gate: on real tasks, candidate vs baseline team accuracy is reported with intervals; a change ships only if McNemar p < 0.05 or retrieval Recall@5 does not drop. All rev 2 tests still pass.
 
 ## Explicitly Excluded

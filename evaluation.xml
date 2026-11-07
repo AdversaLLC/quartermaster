@@ -1,0 +1,45 @@
+<!-- Answers verified 2026-11-07 by calling the plugin-snapshot tools against the
+     snapshot built from plugin-directory-cache-v2.json (fetched 2026-11-07T19:43Z).
+     Stable while snapshot.json is not rebuilt from a newer directory. -->
+<evaluation>
+  <qa_pair>
+    <question>Across the whole plugin snapshot, how many MCP servers are indexed in total?</question>
+    <answer>2331</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>How many skills are indexed across all plugins in the snapshot?</question>
+    <answer>20176</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>The Superpowers plugin lists exactly one npm dependency. What is that package's name?</question>
+    <answer>ws</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>The rea plugin's MCP server is launched by a script with a version string as its second argument. What is that version?</question>
+    <answer>6.8.0</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Which plugin ships the skill named adobe-anypdf?</question>
+    <answer>adobe</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>The official github plugin connects to a remote MCP server over HTTP. What URL does it use?</question>
+    <answer>https://api.githubcopilot.com/mcp/</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Which hook event does the Superpowers plugin register?</question>
+    <answer>SessionStart</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>How many hook event entries are indexed across all plugins?</question>
+    <answer>1665</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>An MCP server named rubixkube appears in the snapshot. Which plugin provides it?</question>
+    <answer>rubixkube</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>The frontend-design plugin from the official marketplace contains a single skill. What is that skill's name?</question>
+    <answer>frontend-design</answer>
+  </qa_pair>
+</evaluation>

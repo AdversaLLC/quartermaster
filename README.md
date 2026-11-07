@@ -1,5 +1,9 @@
 # Quartermaster
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)
+![Dependencies: none](https://img.shields.io/badge/dependencies-stdlib%20only-green.svg)
+
 A local MCP server for Claude Code. You describe a task once. It answers with:
 
 - the team the task belongs to (for example `security-reverse-eng`, `debug`, `research`)
@@ -27,11 +31,25 @@ index file and makes no network calls.
 
 ## Install
 
-Requires Python 3 and Claude Code (the rebuild reads Claude Code's plugin
+Requires Python 3.11+ and Claude Code (the rebuild reads Claude Code's plugin
 directory cache at `~/.claude/plugins/plugin-directory-cache-v2.json`).
 
+### Arch Linux (package)
+
 ```
-git clone <this repo> quartermaster
+git clone https://github.com/AdversaLLC/quartermaster
+cd quartermaster/packaging/arch
+makepkg -si
+quartermaster-rebuild                 # data goes to ~/.local/share/quartermaster
+claude mcp add -s user quartermaster -- quartermaster-mcp
+```
+
+Set `QM_DATA` to keep the data elsewhere.
+
+### From source
+
+```
+git clone https://github.com/AdversaLLC/quartermaster
 cd quartermaster
 ./rebuild.sh          # optional arg: parallel fetch workers, default 16
 claude mcp add quartermaster -- python3 /path/to/quartermaster/qm_mcp.py

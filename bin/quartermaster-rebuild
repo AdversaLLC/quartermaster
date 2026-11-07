@@ -1,0 +1,11 @@
+#!/bin/sh
+# Fetch plugin manifests (no code is run), build the snapshot and the router index.
+# Usage: quartermaster-rebuild [workers]   (default 16; needs Claude Code installed)
+set -eu
+export QM_DATA="${QM_DATA:-${XDG_DATA_HOME:-$HOME/.local/share}/quartermaster}"
+mkdir -p "$QM_DATA"
+cd /usr/lib/quartermaster
+echo "[1/3] fetching plugin manifests into $QM_DATA/repos"; python3 fetch.py "${1:-16}"
+echo "[2/3] building snapshot.json"; python3 build_index.py
+echo "[3/3] building qm_index.json"; python3 qm_build.py
+echo "done. Register with: claude mcp add -s user quartermaster -- quartermaster-mcp"

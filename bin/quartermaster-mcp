@@ -1,0 +1,4 @@
+#!/bin/sh
+# Quartermaster stdio MCP server. Data (snapshot + index) lives in $QM_DATA.
+export QM_DATA="${QM_DATA:-${XDG_DATA_HOME:-$HOME/.local/share}/quartermaster}"
+exec python3 /usr/lib/quartermaster/qm_mcp.py "$@"

@@ -1,0 +1,28 @@
+# Maintainer: The Quartermaster contributors
+pkgname=quartermaster
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Local stdlib-only MCP for Claude Code: route a task to a risk-graded per-step kit"
+arch=('any')
+url="https://github.com/AdversaLLC/quartermaster"
+license=('MIT')
+depends=('python>=3.11' 'git')
+checkdepends=('python-pytest')
+optdepends=('claude-code: registers the MCP and provides the plugin directory cache')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+check() {
+  cd "$pkgname-$pkgver"
+  python -m pytest -q tests/test_router.py
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  install -dm755 "$pkgdir/usr/lib/$pkgname"
+  install -m644 ./*.py "$pkgdir/usr/lib/$pkgname/"
+  install -Dm755 bin/quartermaster-mcp "$pkgdir/usr/bin/quartermaster-mcp"
+  install -Dm755 bin/quartermaster-rebuild "$pkgdir/usr/bin/quartermaster-rebuild"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 NOTICE README.md ROUTER-SPEC.md -t "$pkgdir/usr/share/doc/$pkgname/"
+}

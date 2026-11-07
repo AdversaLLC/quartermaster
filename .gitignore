@@ -12,3 +12,10 @@ __pycache__/
 .tokencut/
 CLAUDE.local.md
 eval_runs/
+
+# Prompt library (FR-22): local config and clones, never redistributed
+prompt_repos/
+prompt_sources.json
+real_tasks_raw.jsonl
+real_tasks.jsonl
+tool_links.json

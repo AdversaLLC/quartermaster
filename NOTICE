@@ -13,3 +13,5 @@ redistributed by this project.
 This project is not affiliated with, sponsored by or endorsed by Anthropic.
 "Claude" and "Claude Code" are trademarks of Anthropic, used here only to
 describe what this tool works with.
+
+Local evaluation prompts (real_tasks*.jsonl) are sampled by qm_sample.py from SWE-chat (SALT-NLP, ODC-BY, https://huggingface.co/datasets/SALT-NLP/SWE-chat); they stay in the data dir and are not redistributed.

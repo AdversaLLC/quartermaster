@@ -10,3 +10,5 @@ __pycache__/
 *.log
 .governor/
 .tokencut/
+CLAUDE.local.md
+eval_runs/

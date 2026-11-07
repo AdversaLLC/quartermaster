@@ -3,9 +3,11 @@ over the labeled set in tests/routing_set.json. Labels were written by Claude:
 a sanity check, not a benchmark."""
 import json
 import os
+import sys
 
 import qm_build
 import qm_route
+import qm_stats
 import qm_teams
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -99,5 +101,47 @@ def report(rows):
             print(f"- {r['task']}\n    {', '.join(r['bm25']) or '(nothing)'}")
 
 
+def summary(rows):
+    """FR-15: per split, each metric with its 95% Wilson interval."""
+    for name in ("dev", "holdout", "all"):
+        sub = [r for r in rows if name == "all" or r.get("split") == name]
+        n = len(sub)
+        for metric, key in (("Recall@5", "bm25_hit"), ("team acc", "team_ok")):
+            k = sum(bool(r[key]) for r in sub)
+            lo, hi = qm_stats.wilson(k, n)
+            print(f"{name:7} {metric:8} {k}/{n} = {k / (n or 1):.2f}  [{lo:.2f}, {hi:.2f}]")
+
+
+def runs_dir():
+    path = os.path.join(os.environ.get("QM_DATA") or HERE, "eval_runs")
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def compare(rows, name):
+    """FR-15: paired exact McNemar between a saved run and this one."""
+    with open(os.path.join(runs_dir(), f"{name}.json")) as fh:
+        old = {r["task"]: r for r in json.load(fh)}
+    pairs = [(old[r["task"]], r) for r in rows if r["task"] in old]
+    for metric, key in (("Recall@5", "bm25_hit"), ("team acc", "team_ok")):
+        a, b = [bool(o[key]) for o, _ in pairs], [bool(n[key]) for _, n in pairs]
+        print(f"vs {name}: {metric} {sum(a)}->{sum(b)} of {len(pairs)}, McNemar p={qm_stats.mcnemar(a, b):.3f}")
+
+
+def main(argv):
+    path = argv[argv.index("--set") + 1] if "--set" in argv else SET_PATH
+    items = load_set(path)
+    rows = score(qm_route.load(INDEX_PATH), items)
+    for r, it in zip(rows, items):
+        r["split"], r["team_ok"] = it.get("split", "dev"), r["team"] == r["label"]
+    report(rows)
+    summary(rows)
+    if "--save" in argv:
+        with open(os.path.join(runs_dir(), argv[argv.index("--save") + 1] + ".json"), "w") as fh:
+            json.dump(rows, fh, indent=1)
+    if "--compare" in argv:
+        compare(rows, argv[argv.index("--compare") + 1])
+
+
 if __name__ == "__main__":
-    report(score(qm_route.load(INDEX_PATH), load_set()))
+    main(sys.argv[1:])

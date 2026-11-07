@@ -10,10 +10,11 @@ import sys
 import time
 
 import qm_audit
+import qm_prompts
 import qm_teams
 
 ROOT = os.environ.get("QM_DATA") or os.path.dirname(os.path.abspath(__file__))   # data dir; code may live in /usr/lib
-KINDS = {"skills": "skill", "agents": "agent", "commands": "command", "mcp": "mcp"}
+KINDS = {"skills": "skill", "agents": "agent", "commands": "command", "mcp": "mcp", "prompts": "prompt", "links": "link"}
 HOME = os.path.expanduser("~")
 
 
@@ -64,6 +65,8 @@ def build(recs, audits, installed, installed_skills=frozenset()):
                     "deps": _deps(r),
                     "terms": terms(f"{text} {text} {r.get('summary') or ''}"),
                 })
+                if kind == "link":
+                    comps[-1]["url"] = c.get("url", "")
     df = {}
     for c in comps:
         for t in set(c["terms"]):
@@ -71,6 +74,19 @@ def build(recs, audits, installed, installed_skills=frozenset()):
     avgdl = sum(len(c["terms"]) for c in comps) / max(len(comps), 1)
     return {"components": comps, "audits": {k: list(v) for k, v in audits.items()},
             "df": df, "avgdl": avgdl, "N": len(comps)}
+
+
+def link_records(data_dir):
+    """FR-23: user-local external tool links; [] when tool_links.json is absent."""
+    path = os.path.join(data_dir, "tool_links.json")
+    if not os.path.exists(path):
+        return []
+    with open(path) as fh:
+        links = [x for x in json.load(fh) if isinstance(x, dict) and x.get("name") and x.get("url")]
+    return [{"name": "links", "summary": "external tool links", "fetched": True, "repo": "",
+             "subpath": "", "skills": [], "agents": [], "commands": [], "mcp": [], "hooks": [],
+             "deps": {}, "links": [{"name": x["name"], "url": x["url"],
+                                    "desc": str(x.get("desc", ""))[:200]} for x in links]}]
 
 
 def file_sha256(path):
@@ -105,7 +121,11 @@ def main():
     snap = os.path.join(ROOT, "snapshot.json")
     with open(snap) as fh:
         recs = json.load(fh)
-    audits = {r["name"]: tuple(qm_audit.audit_plugin(plugin_root(r), r.get("mcp"))) for r in recs}
+    recs += qm_prompts.records(ROOT)        # FR-22: local prompt library, if configured
+    recs += link_records(ROOT)               # FR-23: local tool links, if configured
+    audits = {r["name"]: ("A", []) if "prompts" in r      # FR-22: text only, nothing runs
+              else ("B", ["external link; nothing fetched or run"]) if "links" in r
+              else tuple(qm_audit.audit_plugin(plugin_root(r), r.get("mcp"))) for r in recs}
     plugins, skills = installed_sets()
     idx = build(recs, audits, plugins, skills)
     idx["built_from"] = file_sha256(snap)

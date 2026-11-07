@@ -1,0 +1,12 @@
+# Built locally by ./rebuild.sh; never redistributed (see NOTICE)
+repos/
+snapshot.json
+qm_index.json
+lists/
+
+# Local tooling and caches
+__pycache__/
+.pytest_cache/
+*.log
+.governor/
+.tokencut/

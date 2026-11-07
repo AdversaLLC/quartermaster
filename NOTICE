@@ -1,0 +1,15 @@
+Quartermaster
+Copyright (c) 2026 The Quartermaster contributors
+
+This repository ships code only, under the MIT License (see LICENSE).
+
+Plugin content, names and descriptions belong to their respective authors and
+remain under their own licenses. None of that content is included here.
+
+The plugin snapshot (repos/, snapshot.json, lists/) and the router index
+(qm_index.json) are built locally by each user with ./rebuild.sh and are not
+redistributed by this project.
+
+This project is not affiliated with, sponsored by or endorsed by Anthropic.
+"Claude" and "Claude Code" are trademarks of Anthropic, used here only to
+describe what this tool works with.

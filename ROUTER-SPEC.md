@@ -2,7 +2,7 @@
 
 **Author:** Claude (for the user)
 **Date:** 2026-11-07
-**Status:** Rev 2 — approved to build ("continue build the one shot ship", 2026-11-07)
+**Status:** Rev 2 — built and released as v0.1.0. Rev 3 (section at the end) — draft, awaiting approval
 **Reviewers:** the user; DeepSeek second opinion (log: `~/.claude/call-a-friend/2026-11-07T14-39-18-deepseek-browser-router-spec.md`)
 **Builds on:** `SPEC.md` (plugin snapshot, approved). Rev 1 kept as `ROUTER-SPEC.rev1.md`.
 
@@ -117,3 +117,60 @@ interface ExplainIn { id: string; }   // name@plugin, or a bare name (FR-14)
 - OS-1: Installing plugins. OS-2: Calling DeepSeek from the MCP. OS-3: LLM-based auditing.
 - OS-4: Proxying calls to underlying MCP servers. OS-5: Embeddings (they would break NFR-4).
 - OS-6: Adaptive depth beyond the score-gap rule (search-based depth is a later step).
+
+---
+
+# Rev 3 — Team routing, real eval tasks, prompt library (draft, awaiting approval)
+
+Basis: two DeepSeek reviews on 2026-11-07 (`~/.claude/call-a-friend/*team-routing.md`,
+`*rev3-evalsources.md`). Checked on this machine: 12 holdout tasks give ±28 pp, so pass/fail
+gates on them are meaningless; `SALT-NLP/SWE-chat` (ODC-BY) and `hao-li/AIDev` (CC-BY-4.0) exist
+on Hugging Face; SWE-bench Verified shows no license tag (unverified).
+
+## Purpose
+Raise team-pick accuracy (0.58, n=36) without lowering retrieval, measure it on real user
+phrasing instead of self-written tasks, and let the router recommend tested system prompts from a
+user-chosen prompt library where they fit.
+
+## Inputs
+| Input | Type | Required | Constraints | Default |
+|---|---|---|---|---|
+| task | string | yes | non-empty after strip | — |
+| team rule | (phrase, weight) | — | weight in {0.5, 1, 3, -2}; 0.5 = generic verbs (find, write, test, fix) | — |
+| synonym map | term -> [terms] | — | ≤ 15 entries; each fixes ≥ 2 dev misses | empty |
+| `prompt_sources.json` (data dir) | list of git URLs | no | user-local, never committed | absent = feature off |
+| real eval tasks | `tests/real_tasks.jsonl` in the data dir | no | from SWE-chat user prompts, never committed | — |
+
+## Functional Requirements
+- FR-15: Eval sets carry `split` (dev/holdout), chosen by a seeded stratified random split (seed recorded). `qm_eval.py` reports each metric with a 95% Wilson interval and, between two runs, a paired comparison (McNemar exact). Tuning uses dev only.
+- FR-16: The rule classifier returns normalised team scores. Negative phrases subtract before normalising. Confidence = top1 − top2 margin; below 0.2 (calibrated on dev) the task is low-confidence.
+- FR-17: Soft prior replaces the hard team boost: `boost = W * (P(primary) + 0.5 * max P(secondary))`. Components labelled `general` get `W * 0.5 * P(top team)` (neutral, like a secondary match). Low-confidence or no-hit tasks set every P to 0, giving pure BM25. `W` is chosen from {1.5, 2, 3, 4} on dev and recorded.
+- FR-18: Weighted phrase rules as in the Inputs table.
+- FR-19: Synonym map expands task text for team scoring only, adding to (not replacing) original matches.
+- FR-20: `explain` shows the component's team prior value for a given task when called with `task`.
+- FR-21: Real eval tasks: a script samples about 150 user prompts from SWE-chat into the data dir. They are labelled with a team and expected component substrings before the router is run on them. Neither the prompts nor the labels are committed (attribution noted in NOTICE).
+- FR-22: Prompt library: when `prompt_sources.json` exists, the rebuild clones those repos into `prompt_repos/` (data dir, gitignored) and indexes each prompt file as kind `prompt` with id `file@repo`, team labels and a 200-char excerpt. Prompts compete in the `plan` and `execute` stations like other components, grade `A` (text only, nothing runs). Route lines show the id and local path, never the full text. No prompt text is shipped in the repo, tests or release.
+
+## Edge Cases
+| Case | Expected |
+|---|---|
+| EC-6: two teams tie | Low confidence: `team: unknown (derived)`, pure BM25 |
+| EC-7: only negative phrases match | All P = 0 (pure BM25); reason shown in header |
+| EC-8: synonym maps to two teams | Its weight splits equally; original matches still count |
+| EC-10: prompt source unreachable | Rebuild warns and continues; index notes the source as missing |
+| EC-11: prompt file not text or > 200 KB | Skipped and listed |
+
+## Acceptance Criteria
+- AC-11 (FR-15): `qm_eval.py` prints Wilson intervals and a McNemar p-value between baseline and candidate; the baseline run is saved before any rev 3 change.
+- AC-12 (FR-17): synthetic fixture with fixed BM25 scores: an off-team component scoring 10.0 beats an on-team one scoring 6.0 with W = 3 and P = 1.0.
+- AC-13 (FR-16, EC-6, EC-7): synthetic tie returns `unknown (derived)`; a negatives-only task yields pure BM25 ranking.
+- AC-14 (FR-17): a `general` component gets the neutral boost (fixture with exact expected value).
+- AC-15 (FR-20): `explain(id, task)` prints the expected prior value for a fixture.
+- AC-16 (FR-21): the sampler writes only into the data dir; a test asserts no file under the repo tree is created.
+- AC-17 (FR-22): with a fixture prompt repo, a matching task routes `file@repo` into `execute`; the route text never contains more than the 70-char excerpt; `git ls-files` contains no prompt text.
+- Release gate: on real tasks, candidate vs baseline team accuracy is reported with intervals; a change ships only if McNemar p < 0.05 or retrieval Recall@5 does not drop. All rev 2 tests still pass.
+
+## Explicitly Excluded
+- Using leaked vendor prompts as eval tasks (vendor wording, not user phrasing; AGPL text cannot enter the MIT repo).
+- A trained classifier; BM25 query expansion (RM3); BM25F / `b` tuning (later, dev only).
+- Shipping or summarising prompt-library content in the public repo.

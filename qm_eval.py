@@ -131,6 +131,8 @@ def compare(rows, name):
 def main(argv):
     path = argv[argv.index("--set") + 1] if "--set" in argv else SET_PATH
     items = load_set(path)
+    if "--split" in argv:                      # e.g. --split dev: never score the holdout while tuning
+        items = [it for it in items if it.get("split", "dev") == argv[argv.index("--split") + 1]]
     rows = score(qm_route.load(INDEX_PATH), items)
     for r, it in zip(rows, items):
         r["split"], r["team_ok"] = it.get("split", "dev"), r["team"] == r["label"]

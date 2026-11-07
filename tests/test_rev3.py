@@ -52,18 +52,35 @@ def comp(team, secondary=()):
 def test_ac12_off_team_strong_match_still_wins():
     prior = {"debug": 1.0}
     on, off = comp("debug"), comp("research")
-    assert 10.0 + qr.team_boost(off, prior, 3.0) > 6.0 + qr.team_boost(on, prior, 3.0)
-    assert qr.team_boost(on, prior, 3.0) == pytest.approx(3.0)
+    assert qr.team_norm(on, prior) == pytest.approx(1 / 1.5)
+    # normalised BM25 1.0 off-team beats 0.6 on-team at the largest swept W with full confidence
+    assert qr.combine(1.0, 0, 1.0, qr.team_norm(off, prior), 0.3) > qr.combine(0.6, 0, 1.0, qr.team_norm(on, prior), 0.3)
 
 
 def test_ac12_secondary_counts_half():
     prior = {"debug": 0.6, "research": 0.4}
-    assert qr.team_boost(comp("build", ["research"]), prior, 2.0) == pytest.approx(2.0 * 0.5 * 0.4)
+    assert qr.team_norm(comp("build", ["research"]), prior) == pytest.approx(0.5 * 0.4 / 1.5)
 
 
 def test_ac14_general_gets_neutral_boost():
     prior = {"debug": 0.7, "research": 0.3}
-    assert qr.team_boost(comp("general"), prior, 3.0) == pytest.approx(3.0 * 0.5 * 0.7)
+    assert qr.team_norm(comp("general"), prior) == pytest.approx(0.5 * 0.7 / 1.5)
+
+
+def test_fr17_confidence_ramp():
+    assert qt.confidence({}) == 0.0
+    assert qt.confidence({"debug": 1.0}) == 1.0                 # one team only: clearest case
+    assert qt.confidence({"debug": 0.55, "build": 0.45}) == pytest.approx(0.5)
+    assert qt.confidence({"debug": 0.7, "build": 0.3}) == 1.0
+
+
+def test_fr17_combine_and_tiebreak():
+    assert qr.combine(0.5, 1.0, 0.0, 1.0, 0.3) == pytest.approx(0.5 + 0.15)
+    idx = {"components": [{"id": "b@p", "installed": False, "name": "b"},
+                          {"id": "a@p", "installed": True, "name": "a"},
+                          {"id": "c@p", "installed": False, "name": "c"}]}
+    picked = qr._pick(idx, {0: 1.0, 1: 1.0, 2: 1.0}, 5)
+    assert [c["id"] for c in picked] == ["a@p", "b@p", "c@p"]   # score, then installed, then id
 
 
 def test_ac13_low_confidence_is_pure_bm25():

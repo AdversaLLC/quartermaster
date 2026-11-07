@@ -71,7 +71,7 @@ PHRASES = {
 _PHRASES = {t: p.split("|") for t, p in PHRASES.items()}
 GENERIC = frozenset("find write test tests testing fix check build make set run".split())
 NEGATORS = frozenset("not no without don't dont never".split())
-MARGIN = 0.2   # FR-16: top1 - top2 below this is low confidence
+MARGIN = 0.2   # FR-17: margin at which confidence reaches 1 (old hard cut-off)
 
 
 def _negated(toks):
@@ -105,11 +105,15 @@ def _raw_scores(text):
 
 
 def task_prior(text):
-    """FR-16: normalised P(team|task) over positive scores; {} if no hit or low confidence."""
+    """FR-16: normalised P(team|task) over positive scores; {} if nothing positive matched."""
     pos = {t: s for t, s in _raw_scores(text).items() if s > 0}
     total = sum(pos.values())
-    if not total:
-        return {}
-    prior = {t: s / total for t, s in pos.items()}
+    return {t: s / total for t, s in pos.items()} if total else {}
+
+
+def confidence(prior):
+    """FR-17: clamp((top1 - top2) / MARGIN, 0, 1); 0 with no prior, 1 when one team matches alone."""
+    if not prior:
+        return 0.0
     ranked = sorted(prior.values(), reverse=True) + [0.0]
-    return prior if ranked[0] - ranked[1] >= MARGIN else {}
+    return max(0.0, min(1.0, (ranked[0] - ranked[1]) / MARGIN))

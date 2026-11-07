@@ -70,24 +70,33 @@ def _allowed(c, allow_risky):
 STATION_TEAM = {"discuss": "build", "plan": "build", "verify": "review-verify", "ship": "devops-infra"}
 
 
-W = 4.0   # FR-17 prior weight: best dev Recall@5 of {1.5, 2, 3, 4} (23/24), 2026-11-07
+W = 0.15        # FR-17: dev sweep {0.05..0.3} flat (21-22/24, all McNemar p=1.0 vs old formula); midpoint kept
+NAME_A = 0.15   # FR-17 weight of rare name-term hits
 
 
-def team_boost(c, prior, w=W):
-    """FR-17: soft team prior. `general` components get the neutral half-weight boost."""
+def team_norm(c, prior):
+    """FR-17: (P(primary) + 0.5 * max P(secondary)) / 1.5; `general` gets 0.5 * max P / 1.5."""
     if not prior:
         return 0.0
     teams = [t for t, _ in c["teams"]]
     if teams[0] == "general":
-        return w * 0.5 * max(prior.values())
+        return 0.5 * max(prior.values()) / 1.5
     secondary = max((prior.get(t, 0.0) for t in teams[1:]), default=0.0)
-    return w * (prior.get(teams[0], 0.0) + 0.5 * secondary)
+    return (prior.get(teams[0], 0.0) + 0.5 * secondary) / 1.5
 
 
-def _boost(c, qset, prior, w, rare):
-    """Name hits count only rare query terms; plus the soft team prior and an installed nudge."""
-    name_hits = len(qset & set(qm_build.terms(c["name"].replace("-", " "))) & rare)
-    return min(name_hits, 3) * 1.0 + team_boost(c, prior, w) + (0.3 if c["installed"] else 0.0)
+def combine(bm25n, name_n, conf, team_n, w=None):
+    """FR-17: bm25n + 0.15 * name_n + W * conf * team_n (installed is only a tie-break)."""
+    return bm25n + NAME_A * name_n + (W if w is None else w) * conf * team_n
+
+
+def _name_n(c, qset, rare):
+    return min(len(qset & set(qm_build.terms(c["name"].replace("-", " "))) & rare), 3) / 3
+
+
+def _norm(scores):
+    top = max(scores.values(), default=0.0)
+    return {i: s / top for i, s in scores.items()} if top > 0 else {}
 
 
 def _pick(idx, scored, cap):
@@ -146,14 +155,16 @@ def _header(prior, execute_items, top, allow_risky):
 
 
 def _station(idx, station, base, ctx, allow_risky):
-    comps, (qset, prior, rare, sets, terms) = idx["components"], ctx
+    comps, (qset, prior, conf, rare, sets, terms) = idx["components"], ctx
     if station == "execute":
-        return {i: s + _boost(comps[i], qset, prior, W, rare) for i, s in base.items()
+        return {i: combine(s, _name_n(comps[i], qset, rare), conf, team_norm(comps[i], prior))
+                for i, s in base.items()
                 if not any(set(comps[i]["terms"][:6]) & st for st in sets.values())}
     ok_teams = {STATION_TEAM[station]} | set(prior)          # station role, not task team
-    return {i: 0.6 * s + base.get(i, 0.0) + _boost(comps[i], qset, prior, W / 2, rare)
-            for i, s in bm25(idx, terms[station]).items() if _allowed(comps[i], allow_risky)
-            and set(comps[i]["terms"][:6]) & sets[station]
+    sn = _norm({i: s for i, s in bm25(idx, terms[station]).items() if _allowed(comps[i], allow_risky)})
+    return {i: 0.6 * s + combine(base.get(i, 0.0), _name_n(comps[i], qset, rare), conf, team_norm(comps[i], prior))
+            for i, s in sn.items()
+            if set(comps[i]["terms"][:6]) & sets[station]
             and any(t in ok_teams for t, _ in comps[i]["teams"])}
 
 
@@ -164,12 +175,14 @@ def route(idx, task, allow_risky=False, depth="normal"):
     rare = {t for t in qset if idx["df"].get(t, 0) < 0.01 * idx["N"]}   # 1% of components
     prior = qm_teams.task_prior(task)
     comps = idx["components"]
-    base = {i: s for i, s in bm25(idx, q).items() if _allowed(comps[i], allow_risky)}
-    top = max(base.values(), default=0.0)
+    raw = {i: s for i, s in bm25(idx, q).items() if _allowed(comps[i], allow_risky)}
+    top = max(raw.values(), default=0.0)
+    base = _norm(raw)                                     # FR-17: per-query 0..1
     terms = {s: qm_build.terms(w) for s, w in STATIONS.items()}
     if top < FLOOR:
         prior = {"review-verify": 1.0}
-    ctx = (qset, prior, rare, {s: set(t) for s, t in terms.items()}, terms)
+    conf = qm_teams.confidence(prior)
+    ctx = (qset, prior, conf, rare, {s: set(t) for s, t in terms.items()}, terms)
     body, execute_items = [], []
     for station in ("discuss", "plan", "execute", "verify", "ship"):
         items = _pick(idx, _station(idx, station, base, ctx, allow_risky), cap)
@@ -178,7 +191,8 @@ def route(idx, task, allow_risky=False, depth="normal"):
         if items:
             body.append(f"## {station}")
             body.extend(_line(c) for c in items)
-    head = _header(qm_teams.task_prior(task), execute_items, top, allow_risky)
+    real = qm_teams.task_prior(task)
+    head = _header(real if qm_teams.confidence(real) > 0 else {}, execute_items, top, allow_risky)
     return _fit(head + body, _checkpoints(task))
 
 
@@ -223,4 +237,5 @@ def _prior_line(c, task):
     """FR-20: what the soft team prior adds for this component on this task."""
     prior = qm_teams.task_prior(task)
     shown = ", ".join(f"{t} {p:.2f}" for t, p in sorted(prior.items(), key=lambda kv: -kv[1])) or "none (pure BM25)"
-    return f"\nprior: +{team_boost(c, prior):.2f} (task teams: {shown})"
+    add = W * qm_teams.confidence(prior) * team_norm(c, prior)
+    return f"\nprior: +{add:.3f} (confidence {qm_teams.confidence(prior):.2f}; task teams: {shown})"

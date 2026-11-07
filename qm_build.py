@@ -12,7 +12,7 @@ import time
 import qm_audit
 import qm_teams
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.environ.get("QM_DATA") or os.path.dirname(os.path.abspath(__file__))   # data dir; code may live in /usr/lib
 KINDS = {"skills": "skill", "agents": "agent", "commands": "command", "mcp": "mcp"}
 HOME = os.path.expanduser("~")
 

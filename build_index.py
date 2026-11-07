@@ -14,7 +14,7 @@ from collections import defaultdict
 import fetch
 from writers import write_duplicates, write_failures, write_lists  # noqa: F401
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.environ.get("QM_DATA") or os.path.dirname(os.path.abspath(__file__))   # data dir; code may live in /usr/lib
 PLUG = os.path.expanduser("~/.claude/plugins")
 FM = re.compile(r"^---\s*\n(.*?)\n---", re.S)
 

@@ -9,7 +9,7 @@ import sys
 
 import qm_route
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.environ.get("QM_DATA") or os.path.dirname(os.path.abspath(__file__))   # data dir; code may live in /usr/lib
 INDEX = os.environ.get("QM_INDEX", os.path.join(ROOT, "qm_index.json"))
 _IDX = None
 ANNOTATIONS = {"readOnlyHint": True, "destructiveHint": False,

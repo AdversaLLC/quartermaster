@@ -11,7 +11,7 @@ import re
 import subprocess
 import sys
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.environ.get("QM_DATA") or os.path.dirname(os.path.abspath(__file__))   # data dir; code may live in /usr/lib
 OUT = os.path.join(ROOT, "repos")
 DIRECTORY = os.path.expanduser("~/.claude/plugins/plugin-directory-cache-v2.json")
 WANT = re.compile(

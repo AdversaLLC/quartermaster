@@ -9,7 +9,7 @@ import json
 import os
 import sys
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.environ.get("QM_DATA") or os.path.dirname(os.path.abspath(__file__))   # data dir; code may live in /usr/lib
 KINDS = ("agents", "skills", "commands", "mcp", "hooks")
 MAX_CHARS = 8000
 HINT = "[truncated: page with offset/limit, or narrow with search query/type]"

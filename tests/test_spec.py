@@ -182,8 +182,10 @@ def test_ac1_fetch_log_complete():
 @snapshot
 def test_ac2_only_manifest_files():
     bad = []
-    for dirpath, dirs, files in os.walk(os.path.join(ROOT, "repos")):
-        dirs[:] = [d for d in dirs if d != ".git"]
+    top = os.path.join(ROOT, "repos")
+    for dirpath, dirs, files in os.walk(top):
+        # .git, and top-level dot dirs that other tools drop here (e.g. .governor/), are not plugin repos
+        dirs[:] = [d for d in dirs if d != ".git" and not (dirpath == top and d.startswith("."))]
         for f in files:
             rel = os.path.relpath(os.path.join(dirpath, f), os.path.join(ROOT, "repos"))
             rel = rel.split(os.sep, 1)[1] if os.sep in rel else rel

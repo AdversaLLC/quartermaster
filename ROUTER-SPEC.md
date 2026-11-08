@@ -177,3 +177,58 @@ user-chosen prompt library where they fit.
 - Using leaked vendor prompts as eval tasks (vendor wording, not user phrasing; AGPL text cannot enter the MIT repo).
 - A trained classifier; BM25 query expansion (RM3); BM25F / `b` tuning (later, dev only).
 - Shipping or summarising prompt-library content in the public repo.
+
+---
+
+# Rev 3.2 — Model hint per step (approved; revised after DeepSeek review 2026-11-07)
+
+## Purpose
+Answer "which model should run this step?" next to each kit, based on the task, only when asked.
+The review found the first draft still used a static table (Opus on every plan and verify) and
+had rules that lowered tiers despite saying "raise-only". This version starts every step at the
+middle tier and only raises.
+
+## Inputs
+| Input | Type | Required | Constraints | Default |
+|---|---|---|---|---|
+| `models` (route arg) | boolean | no | non-boolean values are treated as false | false |
+| `qm_models.json` (data dir) | `{"standard": id, "deep": id}` | no | ids must match `[A-Za-z0-9._:/-]{1,64}`, else the default is used | `standard: claude-sonnet-5-5`, `deep: claude-opus-5-5` |
+
+## Outputs
+With `models: true`, a line `model: <id> — <reasons>` follows each station header (headers are
+unchanged, so existing parsers keep working). The last kit line is followed by
+`models are suggestions; override freely`. No prices.
+
+## Behavior (FR-24)
+Every station starts at `standard`. Rules only raise a station to `deep`; reasons are deduplicated
+and printed in the fixed order security, irreversible, unclear, matches-execute.
+1. security: the task prior's top team is `security-reverse-eng` with confidence ≥ 0.5 → execute and verify `deep`.
+2. irreversible: whole-word matches, skipped when within 3 words after a negator (not, no, don't, without, never) or when the task says "dry run"/"dry-run":
+   - execute words: delete, drop, overwrite, migrate, destroy, revoke, rotate, rm, force-push
+   - ship words: deploy, publish, release, push, production, prod, send, charge, refund, transfer
+   A matched word raises its own station.
+3. unclear: the route took the FR-13 clarify path → plan `deep`.
+4. matches-execute: verify is raised to execute's tier if lower.
+No haiku tier: the index has no read-only flag, and name prefixes misclassify mutating tools.
+The router never calls a model (FR-8 unchanged).
+
+## Edge Cases
+| Case | Expected |
+|---|---|
+| EC-12: bad model id or unknown key in `qm_models.json` | Default for that tier |
+| EC-13: `models` false, omitted or non-boolean | Output byte-identical to rev 3.1 |
+| EC-14: several rules hit one station | One line, deduplicated reasons in fixed order |
+| EC-15: "don't deploy", "dry run" | No irreversible raise |
+
+## Acceptance Criteria
+- AC-19 (EC-13): with `models` omitted or `"true"` (a string), output equals rev 3.1 output.
+- AC-20: a trivial task ("rename a variable in utils.py") with `models: true` → every station `standard`.
+- AC-21: with a mocked security prior (confidence 1.0) → execute and verify `deep`, reason `security`.
+- AC-22: "delete the old releases and deploy v2" → execute and ship `deep` (irreversible), verify `deep` (matches-execute); "don't deploy yet" → ship stays `standard`; "push notification" counts (whole word push) but "pushpin" does not.
+- AC-23: `qm_models.json` with `standard: "x\n)"` falls back to the default; a valid id appears.
+- AC-24: the suggestions line is present, no `$` appears, output ≤ 4,000 chars, `tools/list` ≤ 1,500 chars.
+
+## Explicitly Excluded
+- A haiku/lookup tier (no reliable read-only signal yet).
+- Prices in output; automatic model switching; launching subagents.
+- Tier rules learned from data.

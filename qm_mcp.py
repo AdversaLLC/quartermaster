@@ -29,7 +29,8 @@ def t_route(a):
     task = str(a.get("task") or "").strip()
     if not task:
         raise ValueError("task is required")
-    return qm_route.route(idx(), task, bool(a.get("allow_risky")), a.get("depth", "normal"))
+    return qm_route.route(idx(), task, bool(a.get("allow_risky")), a.get("depth", "normal"),
+                          a.get("models") is True)
 
 
 def t_explain(a):
@@ -40,7 +41,7 @@ TOOLS = {
     "route": (t_route, "Describe a task; get the team, a per-step kit (skills/agents/MCP, "
                        "graded, installed y/n) and call-a-friend checkpoints.",
               {"task": {"type": "string"}, "allow_risky": {"type": "boolean"},
-               "depth": {"type": "string", "enum": ["normal", "deep"]}}),
+               "depth": {"type": "string", "enum": ["normal", "deep"]}, "models": {"type": "boolean"}}),
     "explain": (t_explain, "Why a component was routed: teams, rules, risk grade, reasons.",
                 {"id": {"type": "string", "description": "name@plugin"}}),
 }

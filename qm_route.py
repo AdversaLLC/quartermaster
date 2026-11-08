@@ -5,8 +5,10 @@ import os
 import re
 
 import qm_build
+import qm_models
 import qm_teams
 
+DATA_DIR = os.environ.get("QM_DATA") or os.path.dirname(os.path.abspath(__file__))
 K1, B = 1.2, 0.75
 FLOOR = 2.0            # FR-13 confidence floor on the best task score
 CUT = 0.5              # FR-5 keep items scoring >= 50% of the station's best
@@ -168,7 +170,7 @@ def _station(idx, station, base, ctx, allow_risky):
             and any(t in ok_teams for t, _ in comps[i]["teams"])}
 
 
-def route(idx, task, allow_risky=False, depth="normal"):
+def route(idx, task, allow_risky=False, depth="normal", models=False):
     cap = 10 if depth == "deep" else 5
     q = qm_build.terms(task)
     qset = set(q)
@@ -193,6 +195,9 @@ def route(idx, task, allow_risky=False, depth="normal"):
             body.extend(_line(c) for c in items)
     real = qm_teams.task_prior(task)
     head = _header(real if qm_teams.confidence(real) > 0 else {}, execute_items, top, allow_risky)
+    if models is True:                                   # FR-24: strictly opt-in (EC-13)
+        tiers = qm_models.station_tiers(task, real, top < FLOOR)
+        body = qm_models.annotate(body, tiers, qm_models.model_ids(DATA_DIR))
     return _fit(head + body, _checkpoints(task))
 
 
